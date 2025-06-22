@@ -5,7 +5,7 @@ const userSchema = mongoose.Schema({
   firstName: { type: String, required: true },
   email: { type: String, required: true },
   password: { type: String, required: true },
-  saveProductUser: { type: [String], required: true },
+  saveProductUser: [{ type: mongoose.Schema.Types.ObjectId, ref: "Product" }],
   createdAt: { type: Date, required: true },
 });
 

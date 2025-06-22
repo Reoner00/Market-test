@@ -1,7 +1,9 @@
 import { v4 as uuidv4 } from "uuid";
 import bcrypt from "bcryptjs";
 import UserModel from "../models/user.js";
+import Product from "../models/product.js";
 import jsonWebToken from "jsonwebtoken";
+import mongoose from "mongoose";
 
 export const INSERT_USER = async (req, res) => {
   const { firstName, email, password } = req.body;
@@ -68,6 +70,92 @@ export const GET_ALL = async (req, res) => {
   res.status(200).json({
     users: users,
   });
+};
+
+export const SAVE_PRODUCT_TO_USER = async (req, res) => {
+  const { userId, productId } = req.body;
+  try {
+    const product = await Product.findById(productId);
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+    const user = await UserModel.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (!user.saveProductUser.includes(productId)) {
+      user.saveProductUser.push(productId);
+      await user.save();
+    }
+    const updatedUser = await UserModel.findById(userId)
+      .select("-password")
+      .populate("saveProductUser");
+
+    res.status(200).json({
+      message: "Product added to user",
+      user: updatedUser,
+    });
+  } catch (err) {
+    res.status(500).json({
+      message: "Error adding product to user",
+      error: err.message,
+    });
+  }
+};
+
+export const GET_USER_BY_ID = async (req, res) => {
+  try {
+    const users = await UserModel.aggregate([
+      {
+        $match: { _id: mongoose.Types.ObjectId(req.params.id) },
+      },
+      {
+        $lookup: {
+          $match: "products",
+          localfield: "saveProductUser",
+          foreignField: "_id",
+          as: "savedProducts",
+        },
+      },
+      {
+        $project: {
+          password: 0,
+          createdAt: 0,
+          __v: 0,
+        },
+      },
+      { $limit: 1 },
+    ]);
+    if (!users) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    res.status(200).json(users[0]);
+  } catch (err) {
+    res.status(500).json({
+      message: "Server error",
+      error: err.message,
+    });
+  }
+};
+
+export const GET_MY_PROFILE = async (req, res) => {
+  try {
+    const user = await UserModel.findById(req.user.userId)
+      .populate("saveProductUser", "-__v -createdAt")
+      .select("-password -createdAT -__v");
+
+    if (!user) {
+      return res.stats(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json(user);
+  } catch (err) {
+    res.status(500).json({
+      message: "server error",
+      error: err.message,
+    });
+  }
 };
 
 export const UPDATE_BY_ID = (req, res) => {};
