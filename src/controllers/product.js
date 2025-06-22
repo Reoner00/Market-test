@@ -1,9 +1,8 @@
-import { v4 as uuidv4 } from "uuid";
 import Product from "../models/product.js";
 
 export const GET_ALL = async (req, res) => {
   try {
-    const products = await Product.find();
+    const products = await Product.find({ userId: req.user.userId });
 
     return res.status(200).json({
       products: products,
@@ -15,7 +14,10 @@ export const GET_ALL = async (req, res) => {
 
 export const GET_BY_ID = async (req, res) => {
   try {
-    const product = await Product.findOne({ id: id });
+    const product = await Product.findOne({
+      _id: req.params.id,
+      userId: req.user.userId,
+    });
     if (!product) return res.status(404).json({ message: "Product not found" });
     res.json(product);
   } catch (err) {
@@ -39,11 +41,8 @@ export const INSERT = async (req, res) => {
   }
   try {
     const product = new Product({
-      id: uuidv4(),
-      name,
-      imageUrl,
-      description,
-      price,
+      ...req.body,
+      userId: req.user.userId,
       createdAt: new Date(),
     });
 
@@ -62,10 +61,11 @@ export const INSERT = async (req, res) => {
 
 export const UPDATE_BY_ID = async (req, res) => {
   try {
-    const updated = await Product.findOneAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true,
-    });
+    const updated = await Product.findOneAndUpdate(
+      { _id: req.params.id, userId: req.user.userId },
+      req.body,
+      { new: true, runValidators: true }
+    );
     if (!updated) {
       return res.status(404).json({ message: "Product not found" });
     }
@@ -77,7 +77,10 @@ export const UPDATE_BY_ID = async (req, res) => {
 
 export const DELETE_BY_ID = async (req, res) => {
   try {
-    const deleted = await Product.findOneAndDelete(req.params.id);
+    const deleted = await Product.findOneAndDelete({
+      _id: req.params.id,
+      userId: req.user.userId,
+    });
     if (!deleted) return res.status(404).json({ message: "Product not found" });
     res.json({ message: "Product deleted" });
   } catch (err) {

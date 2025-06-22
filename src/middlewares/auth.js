@@ -1,7 +1,8 @@
 import jsonWebToken from "jsonwebtoken";
 
 const auth = (req, res, next) => {
-  const token = req.headers.authorization;
+  const authHeader = req.headers.authorization;
+  const token = authHeader && authHeader.split(" ")[1];
 
   if (!token) {
     return res.status(401).json({ message: "Authorization failed :( " });
@@ -13,10 +14,9 @@ const auth = (req, res, next) => {
         .status(401)
         .json({ message: "Authorization failed (bad token) :( " });
     }
+    req.user = decoded;
+    next();
   });
-  req.user = decoded;
-  next();
-  //   req.body.userID = decoded.userID;
 };
 
 export default auth;

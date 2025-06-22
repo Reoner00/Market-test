@@ -37,39 +37,49 @@ export const INSERT_USER = async (req, res) => {
 };
 
 export const LOGIN_USER = async (req, res) => {
-  const user = await UserModel.findOne({ email: req.body.email });
+  try {
+    const user = await UserModel.findOne({ email: req.body.email });
 
-  if (!user) {
-    return res.status(401).json({ message: "User provided data is wrong" });
-  }
+    if (!user) {
+      return res.status(401).json({ message: "User provided data is wrong" });
+    }
 
-  const isPasswordMatch = await bcrypt.compare(
-    req.body.password,
-    user.password
-  );
-  if (!isPasswordMatch) {
+    const isPasswordMatch = await bcrypt.compare(
+      req.body.password,
+      user.password
+    );
+    if (!isPasswordMatch) {
+      return res
+        .status(401)
+        .json({ message: "User provided data is wrong (password)" });
+    }
+    console.log("logged in");
+
+    const token = jsonWebToken.sign(
+      { userEmail: user.email, userId: user._id },
+
+      process.env.JWT_SECRET,
+      { expiresIn: "12h" }
+    );
     return res
-      .status(401)
-      .json({ message: "User provided data is wrong ( password)" });
-  }
-  console.log("logged in");
-
-  const token = jsonWebToken.sign(
-    { userEmail: user.email, userId: user.id },
-    process.env.JWT_SECRET,
-    { expiresIn: "12h" }
-  );
-  return res
-    .status(200)
-    .json({ message: "User logged in successfuly", jsonWebToken: token }); //uz cryptinam info
+      .status(200)
+      .json({ message: "User logged in successfuly", jsonWebToken: token });
+  } catch (err) {
+    console.error("Login error:", err);
+    return res.status(500).json({
+      message: "Server error during login",
+      error: err.message,
+    });
+  } //crypt info
 };
 
 export const GET_ALL = async (req, res) => {
-  const users = await UserModel.find().select("-password -createdAt -__v");
-
-  res.status(200).json({
-    users: users,
-  });
+  try {
+    const products = await Product.find({ userId: req.user.userId });
+    return res.status(200).json({ products });
+  } catch (err) {
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
 };
 
 export const SAVE_PRODUCT_TO_USER = async (req, res) => {
@@ -104,7 +114,7 @@ export const SAVE_PRODUCT_TO_USER = async (req, res) => {
   }
 };
 
-export const GET_USER_BY_ID = async (req, res) => {
+export const GET_USER_WITH_PRODUCTS = async (req, res) => {
   try {
     const users = await UserModel.aggregate([
       {
@@ -112,7 +122,7 @@ export const GET_USER_BY_ID = async (req, res) => {
       },
       {
         $lookup: {
-          $match: "products",
+          $from: "products",
           localfield: "saveProductUser",
           foreignField: "_id",
           as: "savedProducts",
@@ -138,15 +148,42 @@ export const GET_USER_BY_ID = async (req, res) => {
     });
   }
 };
+export const GET_USER_BY_ID = async (req, res) => {
+  try {
+    const userId = req.body.userId;
+    console.log(userId);
 
+    const user = await UserModel.findOne({ id: userId })
+      .populate({
+        path: "saveProductUser",
+        localField: "saveProductUser",
+        foreignField: "_id",
+        as: "savedProducts",
+      })
+      .select("-password -createdAt -__v");
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    res.status(200).json({
+      user: user,
+    });
+  } catch (err) {
+    res.status(500).json({
+      message: "Server error",
+      error: err.message,
+    });
+  }
+};
 export const GET_MY_PROFILE = async (req, res) => {
   try {
     const user = await UserModel.findById(req.user.userId)
       .populate("saveProductUser", "-__v -createdAt")
-      .select("-password -createdAT -__v");
+      .select("-password -createdAt -__v");
 
     if (!user) {
-      return res.stats(404).json({ message: "User not found" });
+      return res.status(404).json({ message: "User not found" });
     }
 
     res.status(200).json(user);
